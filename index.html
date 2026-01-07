@@ -23,7 +23,7 @@
         Instant Content Planner
       </h1>
       <p class="text-gray-600">
-        Your all-in-one toolkit for content ideation and planning
+        A all-in-one toolkit for content ideation and planning
       </p>
     </div>
 
@@ -35,10 +35,22 @@
 
       <!-- Content -->
       <div class="p-6">
+        <!-- API Key Config -->
+        <div class="mb-4">
+          <div class="flex gap-3 items-center">
+            <input id="apiKeyInput" type="password" placeholder="Enter API key (stored locally)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm" />
+            <button id="saveApiKeyBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">Save</button>
+            <button id="clearApiKeyBtn" class="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm">Clear</button>
+          </div>
+          <p id="apiKeyHint" class="mt-2 text-xs text-gray-500">Stored locally in your browser.</p>
+        </div>
         <!-- Input -->
         <div class="mb-6">
           <div class="flex gap-3">
-            <input id="userInput" type="text"
+            <label for="userInput" class="sr-only">Input for content tool</label>
+            <input id="userInput" type="text" placeholder="Enter your niche or industry (e.g., digital marketing)"
+              title="Enter your niche or industry (e.g., digital marketing)"
               class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
             <button id="generateBtn"
               class="px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:bg-gray-300">
@@ -75,7 +87,7 @@
     let activeTab = "topic";
     let loading = false;
     let copiedIndex = null;
-    let apiKey = localStorage.getItem("gemini_api_key") || "AIzaSyCt-ijnGDH4YtCrkxctA3l_A-UpCFIjG-s";
+    let apiKey = localStorage.getItem("gemini_api_key") || "";
 
     const tools = [
       { id: "topic", name: "Blog Topics", icon: "lightbulb", placeholder: "Enter your niche or industry (e.g., digital marketing)" },
@@ -153,6 +165,34 @@
       }, 2000);
     }
 
+    /* -------------------- API KEY UI -------------------- */
+    function initApiKeyUI() {
+      const keyInput = document.getElementById('apiKeyInput');
+      const saveBtn = document.getElementById('saveApiKeyBtn');
+      const clearBtn = document.getElementById('clearApiKeyBtn');
+      const hint = document.getElementById('apiKeyHint');
+
+      keyInput.value = localStorage.getItem('gemini_api_key') || '';
+
+      saveBtn.onclick = () => {
+        const v = keyInput.value.trim();
+        if (!v) {
+          alert('Please enter a non-empty API key to save.');
+          return;
+        }
+        localStorage.setItem('gemini_api_key', v);
+        apiKey = v;
+        hint.textContent = 'Saved locally. Ready to use.';
+      };
+
+      clearBtn.onclick = () => {
+        localStorage.removeItem('gemini_api_key');
+        keyInput.value = '';
+        apiKey = '';
+        hint.textContent = 'Cleared. Please enter a new API key to continue.';
+      };
+    }
+
     /* -------------------- API INTEGRATION -------------------- */
     let currentResults = [];
 
@@ -179,8 +219,11 @@
         return;
       }
 
+      // ensure we use the latest stored key
+      apiKey = localStorage.getItem('gemini_api_key') || '';
       if (!apiKey) {
-        alert("API Config Error: Please contact support.");
+        alert("API Config Error: No API key found. Please enter and save your API key above.");
+        document.getElementById('apiKeyInput').focus();
         return;
       }
 
@@ -235,7 +278,18 @@
 
         } catch (error) {
           console.warn(`Model ${model} failed:`, error);
-          errorLog.push(`<b>${model}</b>: ${error.message}`);
+          const msg = (error && error.message) ? error.message : String(error);
+          const lower = msg.toLowerCase();
+
+          if (lower.includes('leaked') || lower.includes('reported as leaked') || lower.includes('reported as leaked')) {
+            errorLog.push(`<b>${model}</b>: API key was reported as leaked — please clear and use a new API key (use the field above).`);
+          } else if (lower.includes('quota') || lower.includes('429') || lower.includes('exceeded')) {
+            errorLog.push(`<b>${model}</b>: Quota exceeded or rate-limited. ${msg}`);
+          } else if (lower.includes('not found') || lower.includes('404')) {
+            errorLog.push(`<b>${model}</b>: Model not found or unsupported for this API version.`);
+          } else {
+            errorLog.push(`<b>${model}</b>: ${msg}`);
+          }
         }
       }
 
@@ -302,6 +356,7 @@
     /* -------------------- INIT -------------------- */
     renderTabs();
     updatePlaceholder();
+    initApiKeyUI();
   </script>
 
 </body>
